@@ -164,11 +164,11 @@ async def stream_message(
         if not session:
             raise HTTPException(status_code=404, detail="对话不存在")
         session_id = session.id
+        is_new_session = False
     else:
-        # 自动用第一条消息作为标题
-        title = request.message[:30] + ("..." if len(request.message) > 30 else "")
-        session = await crud.create_session(db, current_user.id, title)
+        session = await crud.create_session(db, current_user.id, "新对话")
         session_id = session.id
+        is_new_session = True
 
     # 保存用户消息
     await crud.add_message(db, session_id, "user", request.message)
@@ -196,11 +196,17 @@ async def stream_message(
             tokens_used = len(full_reply) // 2
             async for db_session in get_db():
                 await crud.add_message(db_session, session_id, "assistant", full_reply, tokens_used)
+
+                # 新对话自动生成标题
+                if is_new_session:
+                    title = await _generate_title(request.message, full_reply)
+                    await crud.update_session_title(db_session, session_id, current_user.id, title)
+
                 await db_session.commit()
                 break
 
             rate_limiter.record_request(str(current_user.id), tokens_used)
-            yield f"data: {json.dumps({'type': 'done', 'remaining_quota': rate_limiter.get_remaining_quota(str(current_user.id))})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'title': title if is_new_session else None, 'remaining_quota': rate_limiter.get_remaining_quota(str(current_user.id))})}\n\n"
 
         except Exception as e:
             import traceback
@@ -216,3 +222,24 @@ async def stream_message(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+async def _generate_title(user_msg: str, ai_reply: str) -> str:
+    """用 LLM 根据对话内容生成标题"""
+    try:
+        from backend.agent.llm_factory import LLMFactory
+        llm = LLMFactory.create()
+
+        prompt = f"请根据以下对话内容，生成一个简短的标题（不超过20个字，不要加引号）：\n\n用户：{user_msg[:100]}\n助手：{ai_reply[:100]}"
+
+        response = await llm.acomplete(prompt)
+        title = str(response).strip().strip('"').strip("'")
+
+        # 限制长度
+        if len(title) > 25:
+            title = title[:25] + "..."
+
+        return title if title else "新对话"
+    except Exception:
+        # 降级：用用户消息截断
+        return user_msg[:20] + ("..." if len(user_msg) > 20 else "")

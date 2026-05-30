@@ -101,6 +101,10 @@ const Chat: React.FC = () => {
             } else if (data.type === 'chunk') {
               fullReply += data.content
               updateLastMessage(fullReply)
+            } else if (data.type === 'done' && data.title) {
+              // 更新对话标题
+              const store = useChatStore.getState()
+              store.renameSession(store.currentSessionId!, data.title)
             }
           } catch {}
         }
