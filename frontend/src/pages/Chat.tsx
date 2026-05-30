@@ -102,9 +102,15 @@ const Chat: React.FC = () => {
               fullReply += data.content
               updateLastMessage(fullReply)
             } else if (data.type === 'done' && data.title) {
-              // 更新对话标题
-              const store = useChatStore.getState()
-              store.renameSession(store.currentSessionId!, data.title)
+              // 直接更新本地状态中的标题（不发 API）
+              const sid = useChatStore.getState().currentSessionId
+              if (sid) {
+                useChatStore.setState((state) => ({
+                  sessions: state.sessions.map((s) =>
+                    s.id === sid ? { ...s, title: data.title } : s
+                  ),
+                }))
+              }
             }
           } catch {}
         }
