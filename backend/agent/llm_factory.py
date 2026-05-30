@@ -65,11 +65,20 @@ class LLMFactory:
     @staticmethod
     def _create_cloud_llm(config) -> LLM:
         """创建云端 LLM (MiMo) - 使用 OpenAI 兼容接口"""
+        import httpx
         from openai import AsyncOpenAI
+
+        # 创建不使用代理的 httpx 客户端
+        transport = httpx.AsyncHTTPTransport(proxy=None)
+        http_client = httpx.AsyncClient(
+            transport=transport,
+            timeout=httpx.Timeout(60.0, connect=30.0),
+        )
 
         async_client = AsyncOpenAI(
             api_key=config.api_key,
             base_url=config.api_base,
+            http_client=http_client,
         )
 
         return OpenAI(
@@ -82,11 +91,20 @@ class LLMFactory:
     @staticmethod
     def _create_local_llm(config) -> LLM:
         """创建本地 LLM (Qwen) - 兼容 OpenAI API 格式"""
+        import httpx
         from openai import AsyncOpenAI
+
+        # 创建不使用代理的 httpx 客户端
+        transport = httpx.AsyncHTTPTransport(proxy=None)
+        http_client = httpx.AsyncClient(
+            transport=transport,
+            timeout=httpx.Timeout(60.0, connect=30.0),
+        )
 
         async_client = AsyncOpenAI(
             api_key="not-needed",
             base_url=config.api_base,
+            http_client=http_client,
         )
 
         return OpenAI(
