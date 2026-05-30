@@ -6,7 +6,7 @@ import { useAuthStore } from '../store/auth'
 import type { UploadFile } from 'antd/es/upload/interface'
 
 const { Dragger } = Upload
-const { Title } = Typography
+const { Title, Text } = Typography
 
 const KnowledgeBase: React.FC = () => {
   const [stats, setStats] = useState<KnowledgeStats>({ document_count: 0 })
@@ -77,28 +77,34 @@ const KnowledgeBase: React.FC = () => {
         </Col>
       </Row>
 
-      <Card title="上传文档" style={{ marginBottom: 24 }}>
-        <Dragger {...uploadProps} style={{ marginBottom: 16 }}>
-          <p className="ant-upload-drag-icon"><InboxOutlined /></p>
-          <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-          <p className="ant-upload-hint">支持 PDF、Word、Markdown、TXT 格式</p>
-        </Dragger>
-        <Button
-          type="primary"
-          icon={<UploadOutlined />}
-          onClick={handleUpload}
-          loading={loading}
-          disabled={fileList.length === 0}
-        >
-          开始上传
-        </Button>
-      </Card>
+      {isAdmin ? (
+        <>
+          <Card title="上传文档" style={{ marginBottom: 24 }}>
+            <Dragger {...uploadProps} style={{ marginBottom: 16 }}>
+              <p className="ant-upload-drag-icon"><InboxOutlined /></p>
+              <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
+              <p className="ant-upload-hint">支持 PDF、Word、Markdown、TXT 格式</p>
+            </Dragger>
+            <Button
+              type="primary"
+              icon={<UploadOutlined />}
+              onClick={handleUpload}
+              loading={loading}
+              disabled={fileList.length === 0}
+            >
+              开始上传
+            </Button>
+          </Card>
 
-      {isAdmin && (
-        <Card title="管理员操作">
-          <Popconfirm title="确定要清空知识库吗？此操作不可恢复。" onConfirm={handleClear} okText="确定" cancelText="取消">
-            <Button danger icon={<DeleteOutlined />}>清空知识库</Button>
-          </Popconfirm>
+          <Card title="管理员操作">
+            <Popconfirm title="确定要清空知识库吗？此操作不可恢复。" onConfirm={handleClear} okText="确定" cancelText="取消">
+              <Button danger icon={<DeleteOutlined />}>清空知识库</Button>
+            </Popconfirm>
+          </Card>
+        </>
+      ) : (
+        <Card>
+          <Text type="secondary">知识库文档由管理员维护，如有需要请联系管理员上传。</Text>
         </Card>
       )}
     </div>
