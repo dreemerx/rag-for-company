@@ -194,19 +194,26 @@ async def stream_message(
 
             # 保存 AI 回复
             tokens_used = len(full_reply) // 2
+            new_title = None
             async for db_session in get_db():
                 await crud.add_message(db_session, session_id, "assistant", full_reply, tokens_used)
 
                 # 新对话自动生成标题
                 if is_new_session:
-                    title = await _generate_title(request.message, full_reply)
-                    await crud.update_session_title(db_session, session_id, current_user.id, title)
+                    try:
+                        new_title = await _generate_title(request.message, full_reply)
+                        await crud.update_session_title(db_session, session_id, current_user.id, new_title)
+                    except Exception as e:
+                        import traceback
+                        traceback.print_exc()
+                        new_title = request.message[:20] + ("..." if len(request.message) > 20 else "")
+                        await crud.update_session_title(db_session, session_id, current_user.id, new_title)
 
                 await db_session.commit()
                 break
 
             rate_limiter.record_request(str(current_user.id), tokens_used)
-            yield f"data: {json.dumps({'type': 'done', 'title': title if is_new_session else None, 'remaining_quota': rate_limiter.get_remaining_quota(str(current_user.id))})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'title': new_title, 'remaining_quota': rate_limiter.get_remaining_quota(str(current_user.id))})}\n\n"
 
         except Exception as e:
             import traceback
