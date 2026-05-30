@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, AsyncGenerator
 from llama_index.core.agent import ReActAgent
 from llama_index.core.tools import BaseTool as LlamaBaseTool
 from llama_index.core.llms import ChatMessage, MessageRole
@@ -75,6 +75,37 @@ class AgentCore:
             return str(response)
         except Exception as e:
             return f"抱歉，处理您的请求时出现问题: {str(e)}。请稍后再试或联系管理员。"
+
+    async def chat_stream(
+        self,
+        user_id: str,
+        user_name: str,
+        department: str,
+        role: str,
+        message: str,
+    ) -> AsyncGenerator[str, None]:
+        """流式处理用户消息"""
+        agent = self.get_agent_for_user(
+            user_id=user_id,
+            user_name=user_name,
+            department=department,
+            role=role,
+        )
+
+        try:
+            # 使用 LLM 直接流式调用（不经过 Agent 的工具调用）
+            # 先获取完整回复，然后模拟流式输出
+            response = await agent.run(message)
+            full_text = str(response)
+
+            # 按字符流式输出
+            chunk_size = 5  # 每次输出5个字符
+            for i in range(0, len(full_text), chunk_size):
+                chunk = full_text[i:i + chunk_size]
+                yield chunk
+
+        except Exception as e:
+            yield f"抱歉，处理您的请求时出现问题: {str(e)}。请稍后再试或联系管理员。"
 
     def clear_session(self, user_id: str) -> None:
         """清除用户会话"""

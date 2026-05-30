@@ -12,6 +12,7 @@ interface ChatState {
   sessionId: string | null
   loading: boolean
   addMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void
+  updateLastMessage: (content: string) => void
   setSessionId: (sessionId: string) => void
   setLoading: (loading: boolean) => void
   clearMessages: () => void
@@ -33,6 +34,18 @@ export const useChatStore = create<ChatState>()((set) => ({
         },
       ],
     })),
+
+  updateLastMessage: (content) =>
+    set((state) => {
+      const messages = [...state.messages]
+      if (messages.length > 0) {
+        messages[messages.length - 1] = {
+          ...messages[messages.length - 1],
+          content,
+        }
+      }
+      return { messages }
+    }),
 
   setSessionId: (sessionId) => set({ sessionId }),
 

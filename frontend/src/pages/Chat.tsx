@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Card, Input, Button, List, Avatar, Typography, Space, message, Spin } from 'antd'
 import { SendOutlined, UserOutlined, RobotOutlined, ClearOutlined } from '@ant-design/icons'
 import { useChatStore } from '../store/chat'
-import { chatApi } from '../api/chat'
 import ReactMarkdown from 'react-markdown'
 
 const { Text } = Typography
@@ -30,20 +29,61 @@ const Chat: React.FC = () => {
     setLoading(true)
 
     try {
-      const { data } = await chatApi.sendMessage({
-        message: messageText,
-        session_id: sessionId || undefined,
+      // 使用 SSE 流式输出
+      const token = JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token
+
+      const response = await fetch('/api/v1/chat/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message: messageText,
+          session_id: sessionId || undefined,
+        }),
       })
 
-      // 更新 session
-      if (data.session_id) {
-        setSessionId(data.session_id)
+      if (!response.ok) {
+        throw new Error('请求失败')
       }
 
-      // 添加助手回复
-      addMessage({ role: 'assistant', content: data.reply })
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      let fullReply = ''
+
+      // 添加一个空的助手消息
+      addMessage({ role: 'assistant', content: '' })
+
+      while (reader) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const text = decoder.decode(value)
+        const lines = text.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+
+              if (data.type === 'session') {
+                setSessionId(data.session_id)
+              } else if (data.type === 'chunk') {
+                fullReply += data.content
+                // 更新最后一条消息
+                useChatStore.getState().updateLastMessage(fullReply)
+              } else if (data.type === 'done') {
+                // 流式输出完成
+              } else if (data.type === 'error') {
+                message.error(data.message)
+              }
+            } catch {}
+          }
+        }
+      }
     } catch (error: any) {
-      message.error(error.response?.data?.detail || '发送失败，请重试')
+      message.error(error.message || '发送失败，请重试')
     } finally {
       setLoading(false)
     }

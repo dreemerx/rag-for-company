@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 import json
+import asyncio
 
 from backend.auth.models import User
 from backend.auth.rbac import get_current_user
@@ -74,6 +76,70 @@ async def send_message(
             session_id=request.session_id or "",
             remaining_quota=get_rate_limiter().get_remaining_quota(str(current_user.id)),
         )
+
+
+@chat_router.post("/stream")
+async def stream_message(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """SSE 流式输出对话"""
+    # 检查限流
+    rate_limiter = get_rate_limiter()
+    rate_limiter.check_rate_limit(str(current_user.id))
+
+    # 获取或创建会话
+    session_manager = get_session_manager()
+    if request.session_id:
+        session = session_manager.get_session(request.session_id)
+        if not session or session.user_id != str(current_user.id):
+            raise HTTPException(status_code=404, detail="会话不存在")
+        session_id = request.session_id
+    else:
+        session_id = session_manager.create_session(str(current_user.id))
+
+    async def event_generator():
+        try:
+            # 发送会话 ID
+            yield f"data: {json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
+
+            # 调用 Agent 流式输出
+            agent = get_agent()
+            full_reply = ""
+
+            async for chunk in agent.chat_stream(
+                user_id=str(current_user.id),
+                user_name=current_user.full_name or current_user.username,
+                department=current_user.department or "",
+                role=current_user.role_names[0] if current_user.role_names else "user",
+                message=request.message,
+            ):
+                full_reply += chunk
+                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+                await asyncio.sleep(0.01)  # 小延迟避免阻塞
+
+            # 更新会话和限流记录
+            tokens_used = len(full_reply) // 2
+            session_manager.update_session(session_id, tokens_used)
+            rate_limiter.record_request(str(current_user.id), tokens_used)
+
+            # 发送完成信号
+            yield f"data: {json.dumps({'type': 'done', 'remaining_quota': rate_limiter.get_remaining_quota(str(current_user.id))})}\n\n"
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @chat_router.websocket("/ws/{token}")
