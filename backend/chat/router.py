@@ -174,6 +174,10 @@ async def stream_message(
     await crud.add_message(db, session_id, "user", request.message)
     await db.commit()
 
+    # 加载历史消息（用于 Agent 上下文）
+    history_messages = await crud.get_session_messages(db, session_id)
+    history = [{"role": m.role, "content": m.content} for m in history_messages[:-1]]  # 排除刚添加的用户消息
+
     async def event_generator():
         try:
             yield f"data: {json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
@@ -183,10 +187,12 @@ async def stream_message(
 
             async for chunk in agent.chat_stream(
                 user_id=str(current_user.id),
+                session_id=session_id,
                 user_name=current_user.full_name or current_user.username,
                 department=current_user.department or "",
                 role=current_user.role_names[0] if current_user.role_names else "user",
                 message=request.message,
+                history=history,
             ):
                 full_reply += chunk
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"

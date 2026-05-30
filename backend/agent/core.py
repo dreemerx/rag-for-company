@@ -13,23 +13,36 @@ class AgentCore:
     """
     Agent 核心
     基于 LlamaIndex ReActAgent，集成工具系统和会话管理
+
+    隔离策略：
+    - 每个用户的每个对话独立创建 Agent 实例
+    - key 格式: "{user_id}_{session_id}"
+    - 切换对话时创建新 Agent，上下文完全隔离
     """
 
     def __init__(self):
         self.llm = LLMFactory.create()
         self.registry = get_tool_registry()
-        self._sessions: dict[str, ReActAgent] = {}
+        self._agents: dict[str, ReActAgent] = {}
 
-    def get_agent_for_user(
+    def _make_key(self, user_id: str, session_id: int) -> str:
+        """生成 Agent 缓存 key"""
+        return f"{user_id}_{session_id}"
+
+    def get_agent(
         self,
         user_id: str,
+        session_id: int,
         user_name: str,
         department: str,
         role: str,
+        history: list[dict] | None = None,
     ) -> ReActAgent:
-        """获取或创建用户的 Agent 实例"""
+        """获取或创建 Agent 实例（按 user_id + session_id 隔离）"""
 
-        if user_id not in self._sessions:
+        key = self._make_key(user_id, session_id)
+
+        if key not in self._agents:
             # 根据用户角色获取可用工具
             tools = self.registry.get_tools_for_role(role)
             llama_tools = [t.to_llama_tool() for t in tools]
@@ -41,7 +54,7 @@ class AgentCore:
                 role=role,
             )
 
-            # 创建 Agent (新版 LlamaIndex API)
+            # 创建 Agent
             agent = ReActAgent(
                 tools=llama_tools,
                 llm=self.llm,
@@ -49,75 +62,58 @@ class AgentCore:
                 verbose=True,
             )
 
-            self._sessions[user_id] = agent
+            # 注入历史消息到 Agent 内存
+            if history:
+                for msg in history:
+                    role_enum = MessageRole.USER if msg["role"] == "user" else MessageRole.ASSISTANT
+                    agent.memory.put(ChatMessage(role=role_enum, content=msg["content"]))
 
-        return self._sessions[user_id]
+            self._agents[key] = agent
 
-    async def chat(
-        self,
-        user_id: str,
-        user_name: str,
-        department: str,
-        role: str,
-        message: str,
-    ) -> str:
-        """处理用户消息"""
-        agent = self.get_agent_for_user(
-            user_id=user_id,
-            user_name=user_name,
-            department=department,
-            role=role,
-        )
-
-        try:
-            # 新版 LlamaIndex 使用 run 方法
-            response = await agent.run(message)
-            return str(response)
-        except Exception as e:
-            return f"抱歉，处理您的请求时出现问题: {str(e)}。请稍后再试或联系管理员。"
+        return self._agents[key]
 
     async def chat_stream(
         self,
         user_id: str,
+        session_id: int,
         user_name: str,
         department: str,
         role: str,
         message: str,
+        history: list[dict] | None = None,
     ) -> AsyncGenerator[str, None]:
         """流式处理用户消息"""
-        agent = self.get_agent_for_user(
+        agent = self.get_agent(
             user_id=user_id,
+            session_id=session_id,
             user_name=user_name,
             department=department,
             role=role,
+            history=history,
         )
 
         try:
-            # 使用 LLM 直接流式调用（不经过 Agent 的工具调用）
-            # 先获取完整回复，然后模拟流式输出
             response = await agent.run(message)
             full_text = str(response)
 
-            # 按字符流式输出
-            chunk_size = 5  # 每次输出5个字符
+            chunk_size = 5
             for i in range(0, len(full_text), chunk_size):
-                chunk = full_text[i:i + chunk_size]
-                yield chunk
+                yield full_text[i:i + chunk_size]
 
         except Exception as e:
             yield f"抱歉，处理您的请求时出现问题: {str(e)}。请稍后再试或联系管理员。"
 
-    def clear_session(self, user_id: str) -> None:
-        """清除用户会话"""
-        if user_id in self._sessions:
-            del self._sessions[user_id]
+    def clear_session(self, user_id: str, session_id: int) -> None:
+        """清除指定会话的 Agent"""
+        key = self._make_key(user_id, session_id)
+        if key in self._agents:
+            del self._agents[key]
 
-    def get_session_history(self, user_id: str) -> List[ChatMessage]:
-        """获取用户会话历史"""
-        if user_id in self._sessions:
-            agent = self._sessions[user_id]
-            return agent.memory.get_all() if hasattr(agent, 'memory') else []
-        return []
+    def clear_user(self, user_id: str) -> None:
+        """清除用户的所有 Agent"""
+        keys_to_delete = [k for k in self._agents if k.startswith(f"{user_id}_")]
+        for key in keys_to_delete:
+            del self._agents[key]
 
 
 # 全局 Agent 实例
