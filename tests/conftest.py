@@ -1,31 +1,25 @@
 import pytest
+import pytest_asyncio
 import asyncio
 from httpx import AsyncClient, ASGITransport
 from backend.main import app
 from backend.database import init_db
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session")
 async def setup_db():
     await init_db()
     yield
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client(setup_db):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def auth_headers(client: AsyncClient):
     """获取认证 headers"""
     # 注册用户

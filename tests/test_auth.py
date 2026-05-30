@@ -5,19 +5,21 @@ from httpx import AsyncClient
 @pytest.mark.asyncio
 async def test_register(client: AsyncClient):
     response = await client.post("/api/v1/auth/register", json={
-        "username": "newuser",
-        "email": "new@example.com",
+        "username": "reguser",
+        "email": "reg@example.com",
         "password": "password123",
-        "full_name": "新用户",
+        "full_name": "注册用户",
     })
     assert response.status_code == 201
     data = response.json()
-    assert data["username"] == "newuser"
+    assert data["username"] == "reguser"
     assert "user" in data["roles"]
 
 
 @pytest.mark.asyncio
-async def test_login(client: AsyncClient):
+async def test_login(client: AsyncClient, auth_headers: dict):
+    # auth_headers fixture 已注册并登录了 testuser
+    # 直接用同样的凭据测试登录
     response = await client.post("/api/v1/auth/login", json={
         "username": "testuser",
         "password": "test123456",
@@ -29,7 +31,7 @@ async def test_login(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_login_wrong_password(client: AsyncClient):
+async def test_login_wrong_password(client: AsyncClient, auth_headers: dict):
     response = await client.post("/api/v1/auth/login", json={
         "username": "testuser",
         "password": "wrongpassword",
@@ -46,7 +48,7 @@ async def test_get_me(client: AsyncClient, auth_headers: dict):
 
 
 @pytest.mark.asyncio
-async def test_refresh_token(client: AsyncClient):
+async def test_refresh_token(client: AsyncClient, auth_headers: dict):
     # 先登录获取 refresh token
     login_response = await client.post("/api/v1/auth/login", json={
         "username": "testuser",
