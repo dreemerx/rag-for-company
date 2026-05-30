@@ -22,33 +22,31 @@ const Login: React.FC = () => {
 
     setLoading(true)
     try {
+      // 1. 先清空旧状态
+      localStorage.removeItem('auth-storage')
+      localStorage.removeItem('chat-storage')
+
+      // 2. 登录获取 token
       const { data } = await authApi.login(loginForm)
-      console.log('Login success, token:', data.access_token)
 
-      let userInfo: any = {
-        id: 0,
-        username: loginForm.username,
-        email: '',
-        full_name: null,
-        department: null,
-        is_active: true,
-        roles: ['user'],
-        created_at: new Date().toISOString(),
-      }
+      // 3. 先写入 token，再获取用户信息
+      localStorage.setItem('auth-storage', JSON.stringify({
+        state: { token: data.access_token, refreshToken: data.refresh_token, user: null, isAuthenticated: true },
+        version: 0,
+      }))
 
-      try {
-        const { data: user } = await authApi.getMe()
-        userInfo = user
-      } catch {}
+      // 4. 用新 token 获取完整用户信息（含角色）
+      const { data: user } = await authApi.getMe()
 
-      // setAuth 内部会同步写入 localStorage
-      setAuth(data.access_token, data.refresh_token, userInfo)
+      // 5. 写入完整信息
+      setAuth(data.access_token, data.refresh_token, user)
       message.success('登录成功')
 
-      // 直接跳转
+      // 6. 跳转
       window.location.href = '/'
     } catch (error: any) {
       console.error('Login error:', error)
+      localStorage.removeItem('auth-storage')
       message.error(error.response?.data?.detail || '登录失败')
     } finally {
       setLoading(false)
