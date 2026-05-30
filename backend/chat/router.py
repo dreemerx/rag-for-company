@@ -240,19 +240,48 @@ async def stream_message(
 async def _generate_title(user_msg: str, ai_reply: str) -> str:
     """用 LLM 根据对话内容生成标题"""
     try:
-        from backend.agent.llm_factory import LLMFactory
-        llm = LLMFactory.create()
+        from openai import AsyncOpenAI
+        from backend.config.settings import get_settings
+        import httpx
 
-        prompt = f"请根据以下对话内容，生成一个简短的标题（不超过20个字，不要加引号）：\n\n用户：{user_msg[:100]}\n助手：{ai_reply[:100]}"
+        settings = get_settings()
+        if settings.LLM_PROVIDER == "cloud":
+            api_key = settings.MIMO_API_KEY
+            base_url = settings.MIMO_API_BASE
+            model = settings.MIMO_MODEL_NAME
+        else:
+            api_key = "not-needed"
+            base_url = f"http://localhost:{settings.LOCAL_MODEL_PORT}/v1"
+            model = settings.LOCAL_MODEL_NAME
 
-        response = await llm.acomplete(prompt)
-        title = str(response).strip().strip('"').strip("'")
+        transport = httpx.AsyncHTTPTransport(proxy=None)
+        http_client = httpx.AsyncClient(transport=transport, timeout=httpx.Timeout(30.0, connect=10.0))
+        client = AsyncOpenAI(api_key=api_key, base_url=base_url, http_client=http_client)
 
-        # 限制长度
-        if len(title) > 25:
-            title = title[:25] + "..."
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "你是一个标题生成器。根据用户的问题生成一个简短标题，不超过15个字，只输出标题，不要任何其他内容。"},
+                {"role": "user", "content": user_msg[:200]},
+            ],
+            max_tokens=50,
+            temperature=0.3,
+        )
 
-        return title if title else "新对话"
-    except Exception:
-        # 降级：用用户消息截断
-        return user_msg[:20] + ("..." if len(user_msg) > 20 else "")
+        title = response.choices[0].message.content or ""
+        title = title.strip().strip('"').strip("'").replace("\n", "")
+
+        # 清理可能的前缀
+        for prefix in ["标题：", "标题:", "主题：", "主题:"]:
+            if title.startswith(prefix):
+                title = title[len(prefix):]
+
+        if len(title) > 20:
+            title = title[:20] + "..."
+
+        return title if title and title != "新对话" else user_msg[:15] + ("..." if len(user_msg) > 15 else "")
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return user_msg[:15] + ("..." if len(user_msg) > 15 else "")
