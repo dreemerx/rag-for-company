@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "id": "eval_001",
+      "question": "公司的年假政策是什么？",
+      "expected_answer": "年假",
+      "category": "knowledge_base",
+      "difficulty": "easy"
+    },
+    {
+      "id": "eval_002",
+      "question": "本月销售数据是多少？",
+      "expected_answer": "销售",
+      "category": "database_query",
+      "difficulty": "easy"
+    },
+    {
+      "id": "eval_003",
+      "question": "我有哪些待处理的工单？",
+      "expected_answer": "工单",
+      "category": "ticket_manager",
+      "difficulty": "easy"
+    },
+    {
+      "id": "eval_004",
+      "question": "查看我的未读邮件",
+      "expected_answer": "邮件",
+      "category": "email_summary",
+      "difficulty": "easy"
+    },
+    {
+      "id": "eval_005",
+      "question": "我的审批状态如何？",
+      "expected_answer": "审批",
+      "category": "approval_query",
+      "difficulty": "easy"
+    }
+  ]
+}
