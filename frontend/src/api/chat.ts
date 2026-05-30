@@ -1,35 +1,35 @@
 import apiClient from './client'
 
-export interface ChatRequest {
-  message: string
-  session_id?: string
-}
-
-export interface ChatResponse {
-  reply: string
-  session_id: string
-  remaining_quota: {
-    remaining_requests: number
-    remaining_tokens: number
-    max_requests_per_minute: number
-    max_tokens_per_session: number
-  }
-}
-
 export interface Session {
-  session_id: string
+  id: number
+  title: string
   created_at: string
-  last_active: string
+  updated_at: string
   message_count: number
 }
 
-export const chatApi = {
-  sendMessage: (data: ChatRequest) =>
-    apiClient.post<ChatResponse>('/chat/send', data),
+export interface ChatMessage {
+  id: number
+  role: 'user' | 'assistant'
+  content: string
+  created_at: string
+}
 
+export const chatApi = {
+  // 对话管理
   getSessions: () =>
     apiClient.get<Session[]>('/chat/sessions'),
 
-  deleteSession: (sessionId: string) =>
-    apiClient.delete(`/chat/sessions/${sessionId}`),
+  createSession: (title: string = '新对话') =>
+    apiClient.post<Session>('/chat/sessions', { title }),
+
+  updateSession: (id: number, title: string) =>
+    apiClient.patch<Session>(`/chat/sessions/${id}`, { title }),
+
+  deleteSession: (id: number) =>
+    apiClient.delete(`/chat/sessions/${id}`),
+
+  // 消息历史
+  getMessages: (sessionId: number) =>
+    apiClient.get<ChatMessage[]>(`/chat/sessions/${sessionId}/messages`),
 }

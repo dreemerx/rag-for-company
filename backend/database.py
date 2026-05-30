@@ -3,6 +3,7 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.config.settings import get_settings
 from backend.auth.models import Base
+from backend.chat.models import ChatSession, ChatMessage  # noqa: F401 - 确保表被创建
 
 # 全局引擎
 _engine = None

@@ -1,56 +1,34 @@
 import React from 'react'
-import { Layout, Menu, Avatar, Dropdown, Space } from 'antd'
+import { Layout, Avatar, Dropdown, Space, Tag } from 'antd'
 import {
+  UserOutlined,
+  LogoutOutlined,
   MessageOutlined,
   BookOutlined,
   SettingOutlined,
-  UserOutlined,
-  LogoutOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/auth'
 
-const { Header, Sider, Content } = Layout
+const { Header, Content } = Layout
 
 const MainLayout: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuthStore()
 
-  const menuItems = [
-    {
-      key: '/',
-      icon: <MessageOutlined />,
-      label: '智能对话',
-    },
-    {
-      key: '/knowledge',
-      icon: <BookOutlined />,
-      label: '知识库管理',
-    },
-  ]
+  const isAdmin = user?.roles?.includes('admin')
 
-  // 管理员菜单
-  if (user?.roles?.includes('admin')) {
-    menuItems.push({
-      key: '/admin',
-      icon: <SettingOutlined />,
-      label: '系统管理',
-    })
+  const navItems = [
+    { key: '/', label: '智能对话', icon: <MessageOutlined /> },
+    { key: '/knowledge', label: '知识库', icon: <BookOutlined /> },
+  ]
+  if (isAdmin) {
+    navItems.push({ key: '/admin', label: '管理', icon: <SettingOutlined /> })
   }
 
   const userMenuItems = [
-    {
-      key: 'profile',
-      icon: <UserOutlined />,
-      label: '个人信息',
-    },
-    {
-      key: 'logout',
-      icon: <LogoutOutlined />,
-      label: '退出登录',
-      danger: true,
-    },
+    { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', danger: true },
   ]
 
   const handleUserMenuClick = ({ key }: { key: string }) => {
@@ -62,31 +40,48 @@ const MainLayout: React.FC = () => {
 
   return (
     <Layout style={{ height: '100vh' }}>
-      <Sider width={200} theme="light">
-        <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <h2 style={{ margin: 0, color: '#1677ff' }}>🤖 企业助手</h2>
-        </div>
-        <Menu
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
-          onClick={({ key }) => navigate(key)}
-          style={{ borderRight: 0 }}
-        />
-      </Sider>
-      <Layout>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-          <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
-            <Space style={{ cursor: 'pointer' }}>
-              <Avatar icon={<UserOutlined />} />
-              <span>{user?.full_name || user?.username}</span>
-            </Space>
-          </Dropdown>
-        </Header>
-        <Content style={{ padding: 24, background: '#f5f5f5' }}>
-          <Outlet />
-        </Content>
-      </Layout>
+      <Header
+        style={{
+          background: '#fff',
+          padding: '0 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderBottom: '1px solid #f0f0f0',
+          height: 56,
+        }}
+      >
+        <Space size={24}>
+          <span style={{ fontSize: 18, fontWeight: 600, color: '#1677ff' }}>
+            🤖 企业智能助手
+          </span>
+          {navItems.map((item) => (
+            <a
+              key={item.key}
+              onClick={() => navigate(item.key)}
+              style={{
+                color: location.pathname === item.key ? '#1677ff' : '#666',
+                fontWeight: location.pathname === item.key ? 600 : 400,
+                cursor: 'pointer',
+                fontSize: 14,
+              }}
+            >
+              {item.icon} {item.label}
+            </a>
+          ))}
+        </Space>
+
+        <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
+          <Space style={{ cursor: 'pointer' }}>
+            <Avatar size={28} icon={<UserOutlined />} />
+            <span style={{ fontSize: 14 }}>{user?.full_name || user?.username}</span>
+            {isAdmin && <Tag color="blue" style={{ marginLeft: 0 }}>管理员</Tag>}
+          </Space>
+        </Dropdown>
+      </Header>
+      <Content style={{ background: '#f5f5f5', overflow: 'hidden' }}>
+        <Outlet />
+      </Content>
     </Layout>
   )
 }

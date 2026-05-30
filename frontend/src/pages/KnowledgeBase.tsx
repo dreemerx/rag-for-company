@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Card, Upload, Button, Statistic, Row, Col, message, Popconfirm, Space, Typography } from 'antd'
+import { Card, Upload, Button, Statistic, Row, Col, message, Popconfirm, Typography } from 'antd'
 import { UploadOutlined, DeleteOutlined, FileTextOutlined, InboxOutlined } from '@ant-design/icons'
 import { knowledgeApi, KnowledgeStats } from '../api/knowledge'
 import { useAuthStore } from '../store/auth'
@@ -19,9 +19,7 @@ const KnowledgeBase: React.FC = () => {
     try {
       const { data } = await knowledgeApi.getStats()
       setStats(data)
-    } catch (error) {
-      message.error('获取统计信息失败')
-    }
+    } catch {}
   }
 
   useEffect(() => {
@@ -29,11 +27,7 @@ const KnowledgeBase: React.FC = () => {
   }, [])
 
   const handleUpload = async () => {
-    if (fileList.length === 0) {
-      message.warning('请先选择文件')
-      return
-    }
-
+    if (fileList.length === 0) return
     setLoading(true)
     try {
       const files = fileList.map((f) => f.originFileObj as File)
@@ -72,62 +66,38 @@ const KnowledgeBase: React.FC = () => {
   }
 
   return (
-    <div>
-      <Title level={3}>📚 知识库管理</Title>
+    <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 24px' }}>
+      <Title level={4} style={{ marginBottom: 24 }}>📚 知识库管理</Title>
 
-      {/* 统计卡片 */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={8}>
           <Card>
-            <Statistic
-              title="文档数量"
-              value={stats.document_count}
-              prefix={<FileTextOutlined />}
-            />
+            <Statistic title="文档数量" value={stats.document_count} prefix={<FileTextOutlined />} />
           </Card>
         </Col>
       </Row>
 
-      {/* 上传区域 */}
       <Card title="上传文档" style={{ marginBottom: 24 }}>
         <Dragger {...uploadProps} style={{ marginBottom: 16 }}>
-          <p className="ant-upload-drag-icon">
-            <InboxOutlined />
-          </p>
+          <p className="ant-upload-drag-icon"><InboxOutlined /></p>
           <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-          <p className="ant-upload-hint">
-            支持 PDF、Word、Markdown、TXT 格式
-          </p>
+          <p className="ant-upload-hint">支持 PDF、Word、Markdown、TXT 格式</p>
         </Dragger>
-
-        <Space>
-          <Button
-            type="primary"
-            icon={<UploadOutlined />}
-            onClick={handleUpload}
-            loading={loading}
-            disabled={fileList.length === 0}
-          >
-            开始上传
-          </Button>
-          {fileList.length > 0 && (
-            <Button onClick={() => setFileList([])}>清空选择</Button>
-          )}
-        </Space>
+        <Button
+          type="primary"
+          icon={<UploadOutlined />}
+          onClick={handleUpload}
+          loading={loading}
+          disabled={fileList.length === 0}
+        >
+          开始上传
+        </Button>
       </Card>
 
-      {/* 管理员操作 */}
       {isAdmin && (
         <Card title="管理员操作">
-          <Popconfirm
-            title="确定要清空知识库吗？此操作不可恢复。"
-            onConfirm={handleClear}
-            okText="确定"
-            cancelText="取消"
-          >
-            <Button danger icon={<DeleteOutlined />}>
-              清空知识库
-            </Button>
+          <Popconfirm title="确定要清空知识库吗？此操作不可恢复。" onConfirm={handleClear} okText="确定" cancelText="取消">
+            <Button danger icon={<DeleteOutlined />}>清空知识库</Button>
           </Popconfirm>
         </Card>
       )}
