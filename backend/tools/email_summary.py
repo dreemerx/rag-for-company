@@ -72,10 +72,10 @@ class EmailSummaryTool(BaseTool):
 
     def _generate_summary(self, emails: list) -> str:
         """生成邮件摘要"""
-        summary_parts = [f"📧 共 {len(emails)} 封邮件:\n"]
+        summary_parts = [f"共 {len(emails)} 封邮件:\n"]
 
         for i, email in enumerate(emails, 1):
-            importance = "🔴" if email["is_important"] else "⚪"
+            importance = "[重要]" if email["is_important"] else "[普通]"
             summary_parts.append(
                 f"{importance} {i}. 来自: {email['from']}\n"
                 f"   主题: {email['subject']}\n"

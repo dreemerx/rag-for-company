@@ -58,9 +58,9 @@ class ApprovalQueryTool(BaseTool):
             return ToolResult(success=True, data="暂无审批记录")
 
         # 格式化输出
-        result = "📋 审批列表:\n\n"
+        result = "审批列表:\n\n"
         for approval in mock_approvals:
-            status_icon = "⏳" if approval["status"] == "待审批" else "✅"
+            status_icon = "[待审批]" if approval["status"] == "待审批" else "[已通过]"
             result += (
                 f"{status_icon} {approval['id']}\n"
                 f"   类型: {approval['type']}\n"
