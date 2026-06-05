@@ -1,5 +1,4 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import sessionmaker
 
 from backend.config.settings import get_settings
 from backend.auth.models import Base
@@ -32,20 +31,9 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
 
 
-async def get_db() -> AsyncSession:
-    """获取数据库会话（FastAPI 依赖注入）"""
-    if _async_session_factory is None:
-        await init_db()
-
-    async with _async_session_factory() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+def get_session_factory():
+    """获取会话工厂（供 get_db 使用）"""
+    return _async_session_factory
 
 
 async def close_db():

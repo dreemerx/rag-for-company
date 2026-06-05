@@ -20,6 +20,11 @@ const Chat: React.FC = () => {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const sendingSessionIdRef = useRef<number | null>(null)
+  // 保存每个对话的流式响应 { sessionId: replyContent }
+  const streamingRepliesRef = useRef<Record<number, string>>({})
+  // 保存流式响应开始时的消息列表 { sessionId: messages }
+  const savedMessagesRef = useRef<Record<number, any[]>>({})
 
   const {
     sessions,
@@ -63,7 +68,16 @@ const Chat: React.FC = () => {
       }
     }
 
+    // 记录本次发送所属的对话 ID
+    const sendingSessionId = sessionId
+    sendingSessionIdRef.current = sessionId
+    streamingRepliesRef.current[sessionId] = ''
+
     addMessage({ role: 'user', content: text })
+    addMessage({ role: 'assistant', content: '' })
+
+    // 保存当前消息列表（包含 user 和 assistant 消息）
+    savedMessagesRef.current[sessionId] = [...useChatStore.getState().messages]
     setInputValue('')
     setLoading(true)
 
@@ -79,28 +93,46 @@ const Chat: React.FC = () => {
         body: JSON.stringify({ message: text, session_id: sessionId }),
       })
 
-      if (!response.ok) throw new Error('请求失败')
+      if (!response.ok) {
+        if (response.status === 401) {
+          message.error('登录已过期，请重新登录')
+          return
+        }
+        throw new Error(`请求失败 (${response.status})`)
+      }
 
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
       let fullReply = ''
-
-      addMessage({ role: 'assistant', content: '' })
+      let buffer = ''  // SSE 缓冲区，处理跨 chunk 的不完整行
 
       while (reader) {
         const { done, value } = await reader.read()
         if (done) break
 
-        const lines = decoder.decode(value).split('\n')
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        // 保留最后一行（可能不完整）
+        buffer = lines.pop() || ''
+
         for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
+          const trimmed = line.trim()
+          if (!trimmed.startsWith('data: ')) continue
+          const jsonStr = trimmed.slice(6)
+          if (!jsonStr) continue
+
           try {
-            const data = JSON.parse(line.slice(6))
+            const data = JSON.parse(jsonStr)
             if (data.type === 'session' && data.session_id !== currentSessionId) {
               useChatStore.setState({ currentSessionId: data.session_id })
             } else if (data.type === 'chunk') {
               fullReply += data.content
-              updateLastMessage(fullReply)
+              streamingRepliesRef.current[sendingSessionId] = fullReply
+              // 只有当前对话仍是本次发送的对话时才更新 UI
+              const currentSid = useChatStore.getState().currentSessionId
+              if (currentSid === sendingSessionId) {
+                updateLastMessage(fullReply)
+              }
             } else if (data.type === 'done' && data.title) {
               // 直接更新本地状态中的标题（不发 API）
               const sid = useChatStore.getState().currentSessionId
@@ -111,8 +143,28 @@ const Chat: React.FC = () => {
                   ),
                 }))
               }
+            } else if (data.type === 'error') {
+              message.error(data.message || '服务器错误')
             }
-          } catch {}
+          } catch (parseErr) {
+            // SSE JSON 解析失败，记录但继续处理
+            console.warn('SSE 解析失败:', jsonStr, parseErr)
+          }
+        }
+      }
+
+      // 处理缓冲区中剩余的数据
+      if (buffer.trim()) {
+        const trimmed = buffer.trim()
+        if (trimmed.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(trimmed.slice(6))
+            if (data.type === 'error') {
+              message.error(data.message || '服务器错误')
+            }
+          } catch {
+            console.warn('SSE 缓冲区解析失败:', buffer)
+          }
         }
       }
 
@@ -120,8 +172,12 @@ const Chat: React.FC = () => {
       loadSessions()
     } catch (e: any) {
       message.error(e.message || '发送失败')
+      console.error('对话发送异常:', e)
     } finally {
       setLoading(false)
+      sendingSessionIdRef.current = null
+      delete streamingRepliesRef.current[sendingSessionId]
+      delete savedMessagesRef.current[sendingSessionId]
     }
   }
 
@@ -162,6 +218,31 @@ const Chat: React.FC = () => {
     }
   }
 
+  // 切换对话
+  const handleSwitchSession = async (sessionId: number) => {
+    // 如果正在流式响应中，且目标对话就是当前发送的对话
+    if (loading && sendingSessionIdRef.current === sessionId) {
+      // 使用保存的消息列表，更新流式响应内容
+      const savedMessages = savedMessagesRef.current[sessionId]
+      const streamingReply = streamingRepliesRef.current[sessionId]
+      if (savedMessages) {
+        const msgs = [...savedMessages]
+        // 更新最后一条消息（assistant）的内容
+        if (msgs.length > 0 && msgs[msgs.length - 1].role === 'assistant') {
+          msgs[msgs.length - 1] = {
+            ...msgs[msgs.length - 1],
+            content: streamingReply || '',
+          }
+        }
+        useChatStore.setState({ currentSessionId: sessionId, messages: msgs })
+      } else {
+        useChatStore.setState({ currentSessionId: sessionId })
+      }
+      return
+    }
+    await switchSession(sessionId)
+  }
+
   // ==================== 渲染 ====================
 
   return (
@@ -195,7 +276,7 @@ const Chat: React.FC = () => {
             dataSource={sessions}
             renderItem={(session) => (
               <div
-                onClick={() => editingId !== session.id && switchSession(session.id)}
+                onClick={() => editingId !== session.id && handleSwitchSession(session.id)}
                 style={{
                   padding: '10px 12px',
                   marginBottom: 4,

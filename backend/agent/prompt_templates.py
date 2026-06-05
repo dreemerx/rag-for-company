@@ -1,7 +1,14 @@
-class PromptTemplates:
-    """系统提示词模板管理"""
+"""
+系统提示词模板管理模块
+- 定义 Agent 的行为约束和工具调用规则
+- 根据用户角色动态组装提示词
+"""
 
-    # 主系统提示词
+
+class PromptTemplates:
+    """系统提示词模板管理类"""
+
+    # 主系统提示词：定义 Agent 的核心约束和工具调用规则
     SYSTEM_PROMPT = """你是企业内部智能助手，只处理公司内部事务。
 
 【核心约束】
@@ -34,7 +41,7 @@ class PromptTemplates:
 当前用户：{user_name}（{department}，{role}）
 """
 
-    # 管理层额外提示
+    # 管理层额外提示：赋予管理层专属的工具能力
     MANAGER_PROMPT = """
 作为管理层，你还有以下额外能力：
 - 查看团队考勤统计
@@ -44,7 +51,7 @@ class PromptTemplates:
 请注意：处理审批是高风险操作，请在执行前向用户确认。
 """
 
-    # 错误处理提示
+    # 错误处理提示：指导 LLM 如何优雅地处理工具调用失败
     ERROR_PROMPT = """当工具调用失败时，请按以下方式回复用户：
 1. 用通俗易懂的语言说明情况，不要暴露技术细节
 2. 提供可能的替代方案
@@ -55,7 +62,7 @@ class PromptTemplates:
 - "查询超时，您可以尝试换个关键词重新查询。"
 """
 
-    # 高风险操作确认提示
+    # 高风险操作确认提示：要求 LLM 在执行敏感操作前获取用户确认
     CONFIRMATION_PROMPT = """在执行以下操作前，必须先向用户确认：
 - 审批操作（批准/驳回）
 - 删除数据
@@ -67,16 +74,29 @@ class PromptTemplates:
 
     @classmethod
     def get_system_prompt(cls, user_name: str, department: str, role: str) -> str:
-        """获取完整的系统提示词"""
+        """
+        获取完整的系统提示词
+
+        Args:
+            user_name: 用户姓名
+            department: 部门
+            role: 角色（user/manager/admin）
+
+        Returns:
+            组装后的完整系统提示词
+        """
+        # 填充用户信息
         base_prompt = cls.SYSTEM_PROMPT.format(
             user_name=user_name,
             department=department,
             role=role,
         )
 
+        # 管理层追加额外能力提示
         if role in ("manager", "admin"):
             base_prompt += cls.MANAGER_PROMPT
 
+        # 追加错误处理和确认提示
         base_prompt += cls.ERROR_PROMPT
         base_prompt += cls.CONFIRMATION_PROMPT
 

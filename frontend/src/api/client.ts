@@ -30,7 +30,9 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // 登录/注册接口的 401 不做跳转，让调用方自行处理错误提示
+    const isAuthRequest = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/register')
+    if (error.response?.status === 401 && !isAuthRequest) {
       localStorage.removeItem('auth-storage')
       window.location.href = '/login'
     }

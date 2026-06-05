@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import json
+import logging
+import time
+from collections import defaultdict
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -13,19 +17,51 @@ from .jwt_handler import (
     verify_token,
 )
 from .rbac import get_current_user, require_role, get_db
+from backend.utils import audit_log
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 
+# 注册限流：IP -> [(timestamp, ...)]
+_register_rate_limit: dict = defaultdict(list)
+REGISTER_RATE_LIMIT = 5  # 每分钟最多注册次数
+REGISTER_RATE_WINDOW = 60  # 时间窗口（秒）
+
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
+async def register(request: Request, user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     """用户注册"""
+    # 限流检查
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    _register_rate_limit[client_ip] = [
+        ts for ts in _register_rate_limit[client_ip] if ts > now - REGISTER_RATE_WINDOW
+    ]
+    if len(_register_rate_limit[client_ip]) >= REGISTER_RATE_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"注册请求过于频繁，请稍后再试"
+        )
+    _register_rate_limit[client_ip].append(now)
+
+    # 密码强度验证
+    if len(user_data.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="密码长度至少为8位"
+        )
+
     try:
-        return await _register_user(user_data, db)
+        result = await _register_user(user_data, db)
+        logger.info(f"用户注册成功: {user_data.username}")
+        audit_log("register", username=user_data.username, email=user_data.email)
+        return result
+    except HTTPException:
+        raise
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception(f"注册异常: {user_data.username}")
+        raise HTTPException(status_code=500, detail="注册失败，请联系管理员")
 
 
 async def _register_user(user_data: UserCreate, db: AsyncSession):
@@ -51,8 +87,9 @@ async def _register_user(user_data: UserCreate, db: AsyncSession):
     default_role = result.scalar_one_or_none()
 
     if not default_role:
-        # 创建默认角色
-        default_role = Role(name="user", description="普通用户", permissions="knowledge_base,database_query,ticket,email,approval_query")
+        # 创建默认角色（使用 JSON 数组格式存储权限）
+        default_permissions = json.dumps(["knowledge_base", "database_query", "ticket", "email", "approval_query"])
+        default_role = Role(name="user", description="普通用户", permissions=default_permissions)
         db.add(default_role)
         await db.flush()
 
@@ -92,16 +129,23 @@ async def login(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(user_data.password, user.hashed_password):
+        logger.warning(f"登录失败（密码错误）: {user_data.username}")
+        audit_log("login_failed", username=user_data.username, reason="密码错误")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误"
         )
 
     if not user.is_active:
+        logger.warning(f"登录失败（账号禁用）: {user_data.username}")
+        audit_log("login_failed", username=user_data.username, reason="账号禁用")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="账号已被禁用"
         )
+
+    logger.info(f"登录成功: {user.username} (id={user.id})")
+    audit_log("login_success", user_id=user.id, username=user.username)
 
     return Token(
         access_token=create_access_token(data={"sub": user.username}),
@@ -177,4 +221,5 @@ async def assign_role(
         user.roles.append(role)
         await db.flush()
 
+    audit_log("assign_role", user_id=current_user.id, target_user=user.username, role=role.name)
     return {"message": f"已将角色 {role.name} 分配给用户 {user.username}"}

@@ -1,3 +1,4 @@
+import threading
 from typing import Dict, List, Optional
 from .base import BaseTool
 
@@ -52,16 +53,19 @@ class ToolRegistry:
         return list(self._tools.keys())
 
 
-# 全局工具注册中心单例
+# 全局工具注册中心单例（线程安全）
 _registry: Optional[ToolRegistry] = None
+_registry_lock = threading.Lock()
 
 
 def get_tool_registry() -> ToolRegistry:
     """获取全局工具注册中心"""
     global _registry
     if _registry is None:
-        _registry = ToolRegistry()
-        _register_default_tools(_registry)
+        with _registry_lock:
+            if _registry is None:
+                _registry = ToolRegistry()
+                _register_default_tools(_registry)
     return _registry
 
 

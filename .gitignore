@@ -10,20 +10,27 @@ venv/
 *.egg-info/
 dist/
 build/
+.eggs/
+MANIFEST
 
 # Data
 data/
 *.db
+*.sqlite3
 
 # Node
 node_modules/
 frontend/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
@@ -31,9 +38,23 @@ Thumbs.db
 
 # Env (keep .env.example)
 .env
+.env.local
+.env.*.local
 
 # Docker
 .docker/
 
 # Logs
 *.log
+logs/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Temporary
+*.tmp
+*.temp
+*.bak

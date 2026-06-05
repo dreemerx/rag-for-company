@@ -1,3 +1,9 @@
+"""
+邮件摘要工具
+- 读取未读邮件并生成摘要
+- 支持按类型筛选（未读/今日/重要）
+- 当前为模拟数据实现，预留邮件系统对接接口
+"""
 from typing import Any
 from .base import BaseTool, ToolResult
 
@@ -6,6 +12,7 @@ class EmailSummaryTool(BaseTool):
     """邮件摘要工具 - 读取未读邮件，生成摘要"""
 
     def __init__(self):
+        """初始化邮件摘要工具"""
         super().__init__(
             name="email_summary",
             description="读取并总结未读邮件，生成邮件摘要。可按发件人、主题、时间等条件筛选。",
@@ -17,12 +24,16 @@ class EmailSummaryTool(BaseTool):
     async def execute(self, filter_type: str = "unread", limit: int = 10, **kwargs) -> ToolResult:
         """
         获取邮件摘要
+
         Args:
-            filter_type: 筛选类型 (unread, today, important)
+            filter_type: 筛选类型（unread/today/important）
             limit: 返回数量限制
+
+        Returns:
+            邮件摘要
         """
         try:
-            # 模拟邮件数据
+            # 获取模拟邮件数据（实际项目中应调用邮件 API）
             mock_emails = self._get_mock_emails(filter_type, limit)
 
             if not mock_emails:
@@ -31,7 +42,7 @@ class EmailSummaryTool(BaseTool):
                     data="没有符合条件的邮件。"
                 )
 
-            # 生成摘要
+            # 生成格式化摘要
             summary = self._generate_summary(mock_emails)
             return ToolResult(success=True, data=summary)
 
@@ -39,7 +50,16 @@ class EmailSummaryTool(BaseTool):
             return ToolResult(success=False, error=f"获取邮件失败: {str(e)}")
 
     def _get_mock_emails(self, filter_type: str, limit: int) -> list:
-        """模拟邮件数据"""
+        """
+        获取模拟邮件数据
+
+        Args:
+            filter_type: 筛选类型
+            limit: 返回数量限制
+
+        Returns:
+            邮件列表
+        """
         emails = [
             {
                 "from": "hr@company.com",
@@ -64,6 +84,7 @@ class EmailSummaryTool(BaseTool):
             },
         ]
 
+        # 根据筛选类型过滤邮件
         if filter_type == "unread":
             return emails[:limit]
         elif filter_type == "important":
@@ -71,7 +92,15 @@ class EmailSummaryTool(BaseTool):
         return emails[:limit]
 
     def _generate_summary(self, emails: list) -> str:
-        """生成邮件摘要"""
+        """
+        生成邮件摘要
+
+        Args:
+            emails: 邮件列表
+
+        Returns:
+            格式化的邮件摘要字符串
+        """
         summary_parts = [f"共 {len(emails)} 封邮件:\n"]
 
         for i, email in enumerate(emails, 1):

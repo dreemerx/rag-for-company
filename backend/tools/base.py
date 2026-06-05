@@ -3,6 +3,9 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 import asyncio
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -61,29 +64,37 @@ class BaseTool(ABC):
             try:
                 result = await self.execute(**kwargs)
                 if result.success:
+                    if attempt > 0:
+                        logger.info(f"工具 {self.name} 第 {attempt + 1} 次尝试成功")
                     return result
                 last_error = result.error
+                logger.warning(f"工具 {self.name} 执行失败 (attempt {attempt + 1}): {result.error}")
             except Exception as e:
                 last_error = str(e)
+                logger.warning(f"工具 {self.name} 异常 (attempt {attempt + 1}): {e}")
 
             # 指数退避
             if attempt < self.max_retries and self.retryable:
                 wait_time = 2 ** attempt * 0.5  # 0.5s, 1s, 2s
+                logger.info(f"工具 {self.name} 等待 {wait_time}s 后重试")
                 await asyncio.sleep(wait_time)
 
         # 重试失败，尝试 fallback
         if self.fallback_tool:
+            logger.info(f"工具 {self.name} 重试失败，使用 fallback: {self.fallback_tool.name}")
             try:
                 fallback_result = await self.fallback_tool.execute(**kwargs)
                 fallback_result.fallback_used = True
                 return fallback_result
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"fallback 工具 {self.fallback_tool.name} 也失败: {e}")
 
         # 生成友好错误回复
+        friendly_error = self._format_friendly_error(last_error)
+        logger.error(f"工具 {self.name} 最终失败: {friendly_error}")
         return ToolResult(
             success=False,
-            error=self._format_friendly_error(last_error)
+            error=friendly_error
         )
 
     def _get_confirmation_message(self, **kwargs) -> str:

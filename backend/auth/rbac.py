@@ -1,3 +1,4 @@
+import logging
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,22 +8,24 @@ from sqlalchemy.orm import selectinload
 from .jwt_handler import verify_token
 from .models import User
 
+logger = logging.getLogger(__name__)
+
 security = HTTPBearer()
 
 
 async def get_db():
-    """获取数据库会话"""
-    from backend.database import _async_session_factory
-    if _async_session_factory is None:
+    """获取数据库会话（统一入口）"""
+    from backend.database import get_session_factory
+    factory = get_session_factory()
+    if factory is None:
         raise HTTPException(status_code=500, detail="数据库未初始化")
-    async with _async_session_factory() as session:
+    async with factory() as session:
         try:
             yield session
             await session.commit()
         except Exception as e:
             await session.rollback()
-            import traceback
-            traceback.print_exc()
+            logger.exception(f"数据库会话异常: {e}")
             raise
         finally:
             await session.close()

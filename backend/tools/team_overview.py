@@ -1,3 +1,9 @@
+"""
+团队概览工具
+- 查看团队考勤、项目进度、团队人数等信息
+- 仅管理层可使用（permission_level="manager"）
+- 当前为模拟数据实现，预留 HR/项目管理系统对接接口
+"""
 from typing import Any
 from .base import BaseTool, ToolResult
 
@@ -6,6 +12,7 @@ class TeamOverviewTool(BaseTool):
     """团队概览工具 - 查考勤、项目进度、团队人数（管理层权限）"""
 
     def __init__(self):
+        """初始化团队概览工具"""
         super().__init__(
             name="team_overview",
             description="查看团队概览信息，包括考勤统计、项目进度、团队人数等。仅管理层可使用。",
@@ -17,9 +24,13 @@ class TeamOverviewTool(BaseTool):
     async def execute(self, query_type: str = "all", team_id: str = "", **kwargs) -> ToolResult:
         """
         查询团队概览
+
         Args:
-            query_type: 查询类型 (attendance, projects, headcount, all)
-            team_id: 团队ID（可选）
+            query_type: 查询类型（attendance/projects/headcount/all）
+            team_id: 团队 ID（可选）
+
+        Returns:
+            团队概览数据
         """
         try:
             if query_type == "attendance":
@@ -35,7 +46,15 @@ class TeamOverviewTool(BaseTool):
             return ToolResult(success=False, error=f"查询团队信息失败: {str(e)}")
 
     async def _get_attendance(self, team_id: str) -> ToolResult:
-        """获取考勤统计"""
+        """
+        获取考勤统计
+
+        Args:
+            team_id: 团队 ID
+
+        Returns:
+            考勤统计数据
+        """
         data = {
             "period": "2024年1月",
             "team": team_id or "全部门",
@@ -48,7 +67,15 @@ class TeamOverviewTool(BaseTool):
         return ToolResult(success=True, data=data)
 
     async def _get_project_progress(self, team_id: str) -> ToolResult:
-        """获取项目进度"""
+        """
+        获取项目进度
+
+        Args:
+            team_id: 团队 ID
+
+        Returns:
+            项目进度数据
+        """
         data = {
             "team": team_id or "全部门",
             "total_projects": 12,
@@ -65,7 +92,15 @@ class TeamOverviewTool(BaseTool):
         return ToolResult(success=True, data=data)
 
     async def _get_headcount(self, team_id: str) -> ToolResult:
-        """获取团队人数"""
+        """
+        获取团队人数
+
+        Args:
+            team_id: 团队 ID
+
+        Returns:
+            团队人数数据
+        """
         data = {
             "team": team_id or "全部门",
             "total": 45,
@@ -77,7 +112,15 @@ class TeamOverviewTool(BaseTool):
         return ToolResult(success=True, data=data)
 
     async def _get_all_overview(self, team_id: str) -> ToolResult:
-        """获取全部概览"""
+        """
+        获取全部概览（考勤 + 项目 + 人数）
+
+        Args:
+            team_id: 团队 ID
+
+        Returns:
+            综合概览数据
+        """
         attendance = await self._get_attendance(team_id)
         projects = await self._get_project_progress(team_id)
         headcount = await self._get_headcount(team_id)

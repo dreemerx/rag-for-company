@@ -1,8 +1,13 @@
+"""
+多格式文档加载器
+- 支持 PDF、Word、Markdown、TXT
+- 保留文档结构信息
+"""
 import os
 from typing import List
 from pathlib import Path
 
-from .vector_store import Document
+from .chunker import Document
 
 
 class DocumentLoader:
@@ -62,6 +67,8 @@ class DocumentLoader:
                             "source": str(path),
                             "page": i + 1,
                             "type": "pdf",
+                            "filename": path.name,
+                            "file_type": ".pdf",
                         }
                     ))
             return docs
@@ -81,6 +88,8 @@ class DocumentLoader:
                     metadata={
                         "source": str(path),
                         "type": "docx",
+                        "filename": path.name,
+                        "file_type": ".docx",
                     }
                 )]
             return []
@@ -98,21 +107,34 @@ class DocumentLoader:
                 metadata={
                     "source": str(path),
                     "type": "markdown",
+                    "filename": path.name,
+                    "file_type": ".md",
                 }
             )]
         return []
 
     def _load_txt(self, path: Path) -> List[Document]:
         """加载 TXT 文件"""
-        with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
+        # 尝试不同编码
+        encodings = ["utf-8", "gbk", "gb2312", "latin-1"]
+        content = None
 
-        if content.strip():
+        for encoding in encodings:
+            try:
+                with open(path, "r", encoding=encoding) as f:
+                    content = f.read()
+                break
+            except UnicodeDecodeError:
+                continue
+
+        if content and content.strip():
             return [Document(
                 page_content=content,
                 metadata={
                     "source": str(path),
                     "type": "txt",
+                    "filename": path.name,
+                    "file_type": ".txt",
                 }
             )]
         return []

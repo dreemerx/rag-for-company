@@ -16,9 +16,16 @@ llama-index-llms-openai>=0.1.0
 llama-index-embeddings-openai>=0.1.0
 openai>=1.12.0
 
-# Vector DB
-chromadb>=0.4.22
-llama-index-vector-stores-chroma>=0.1.0
+# Vector DB - Milvus
+pymilvus>=2.4.0
+
+# Embedding & Reranker
+FlagEmbedding>=1.2.0
+sentence-transformers>=2.5.0
+
+# BM25 for Hybrid Search
+rank-bm25>=0.2.2
+jieba>=0.42.1
 
 # Document Loaders
 pypdf>=3.17.0
@@ -35,7 +42,12 @@ aiosqlite>=0.19.0
 # WebSocket
 websockets>=12.0
 
+# HTTP Client
+httpx>=0.25.0
+
 # Testing
 pytest>=7.4.0
 pytest-asyncio>=0.23.0
-httpx>=0.25.0
+
+# RAGAS Evaluation (optional)
+# ragas>=0.1.0

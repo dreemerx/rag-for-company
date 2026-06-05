@@ -1,3 +1,8 @@
+"""
+数据库查询工具
+- 查询公司业务数据（销售、客户、项目、员工等）
+- 当前为模拟数据实现，预留真实数据库对接接口
+"""
 from typing import Any
 from .base import BaseTool, ToolResult
 
@@ -6,6 +11,7 @@ class DatabaseQueryTool(BaseTool):
     """数据库查询工具 - 查询业务数据、生成报表"""
 
     def __init__(self):
+        """初始化数据库查询工具"""
         super().__init__(
             name="database_query",
             description="查询公司业务数据库，可查询销售数据、客户信息、项目进度等。支持生成简单的统计报表。",
@@ -17,9 +23,13 @@ class DatabaseQueryTool(BaseTool):
     async def execute(self, query_type: str = "", params: dict = None, **kwargs) -> ToolResult:
         """
         执行数据库查询
+
         Args:
-            query_type: 查询类型 (sales, customers, projects, etc.)
-            params: 查询参数
+            query_type: 查询类型（sales/customers/projects/employees）
+            params: 查询参数（预留扩展）
+
+        Returns:
+            查询结果
         """
         if not query_type:
             return ToolResult(success=False, error="请指定查询类型")
@@ -27,7 +37,7 @@ class DatabaseQueryTool(BaseTool):
         params = params or {}
 
         try:
-            # 模拟数据库查询（实际项目中应连接真实数据库）
+            # 获取模拟数据（实际项目中应替换为真实数据库查询）
             mock_data = self._get_mock_data(query_type, params)
 
             if not mock_data:
@@ -42,7 +52,16 @@ class DatabaseQueryTool(BaseTool):
             return ToolResult(success=False, error=f"数据库查询失败: {str(e)}")
 
     def _get_mock_data(self, query_type: str, params: dict) -> Any:
-        """模拟数据（开发阶段使用）"""
+        """
+        获取模拟数据（开发阶段使用）
+
+        Args:
+            query_type: 查询类型
+            params: 查询参数
+
+        Returns:
+            模拟的查询结果
+        """
         mock_responses = {
             "sales": "本月销售总额: ¥1,234,567\n环比增长: 12.5%\nTop客户: XX公司、YY集团",
             "customers": "活跃客户数: 156\n新增客户: 23\n流失客户: 5",

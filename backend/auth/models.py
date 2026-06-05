@@ -1,3 +1,4 @@
+import json
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Table
 from sqlalchemy.orm import relationship, DeclarativeBase
 from datetime import datetime
@@ -22,9 +23,20 @@ class Role(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), unique=True, nullable=False)  # admin, manager, user
     description = Column(String(200))
-    permissions = Column(String(500))  # JSON string of permissions
+    permissions = Column(String(500))  # JSON array of permissions
 
     users = relationship("User", secondary=user_roles, back_populates="roles")
+
+    @property
+    def permission_list(self) -> list[str]:
+        """解析权限列表"""
+        if not self.permissions:
+            return []
+        try:
+            return json.loads(self.permissions)
+        except (json.JSONDecodeError, TypeError):
+            # 兼容旧的逗号分隔格式
+            return [p.strip() for p in self.permissions.split(",") if p.strip()]
 
 
 class User(Base):
@@ -50,7 +62,8 @@ class User(Base):
         return role_name in self.role_names
 
     def has_permission(self, permission: str) -> bool:
+        """精确匹配权限（使用 JSON 数组）"""
         for role in self.roles:
-            if role.permissions and permission in role.permissions:
+            if permission in role.permission_list:
                 return True
         return False

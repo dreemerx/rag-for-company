@@ -79,7 +79,7 @@ const MainLayout: React.FC = () => {
           </Space>
         </Dropdown>
       </Header>
-      <Content style={{ background: '#f5f5f5', overflow: 'hidden' }}>
+      <Content style={{ background: '#f5f5f5', overflow: 'auto' }}>
         <Outlet />
       </Content>
     </Layout>

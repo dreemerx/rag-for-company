@@ -1,3 +1,10 @@
+"""
+审批流处理工具
+- 在对话中批准/驳回审批申请
+- 仅管理层可使用（permission_level="manager"）
+- 高风险操作（is_high_risk=True），执行前需要用户确认
+- 当前为模拟数据实现，预留审批系统对接接口
+"""
 from typing import Any
 from .base import BaseTool, ToolResult
 
@@ -6,27 +13,32 @@ class ApprovalProcessTool(BaseTool):
     """审批流处理工具 - 在对话中批准/驳回申请（管理层权限）"""
 
     def __init__(self):
+        """初始化审批处理工具"""
         super().__init__(
             name="approval_process",
             description="处理审批申请，可以直接在对话中批准或驳回申请。仅管理层可使用。高风险操作需要确认。",
             permission_level="manager",
-            is_high_risk=True,  # 高风险操作
+            is_high_risk=True,  # 高风险操作，需要用户确认
             retryable=True,
         )
 
     async def execute(
         self,
         approval_id: str = "",
-        action: str = "",  # approve, reject
+        action: str = "",  # approve 或 reject
         comment: str = "",
         **kwargs
     ) -> ToolResult:
         """
         处理审批
+
         Args:
-            approval_id: 审批单ID
-            action: 操作 (approve, reject)
+            approval_id: 审批单 ID
+            action: 操作类型（approve/reject）
             comment: 审批意见
+
+        Returns:
+            处理结果
         """
         if not approval_id:
             return ToolResult(success=False, error="请提供审批单ID")
@@ -35,7 +47,7 @@ class ApprovalProcessTool(BaseTool):
             return ToolResult(success=False, error="请指定操作类型: approve 或 reject")
 
         try:
-            # 模拟审批处理
+            # 模拟审批处理（实际项目中应调用审批系统 API）
             result = await self._process_approval(approval_id, action, comment)
             return ToolResult(success=True, data=result)
 
@@ -48,7 +60,17 @@ class ApprovalProcessTool(BaseTool):
         action: str,
         comment: str
     ) -> dict:
-        """处理审批请求"""
+        """
+        处理审批请求
+
+        Args:
+            approval_id: 审批单 ID
+            action: 操作类型
+            comment: 审批意见
+
+        Returns:
+            处理结果字典
+        """
         action_text = "批准" if action == "approve" else "驳回"
 
         return {
@@ -60,7 +82,13 @@ class ApprovalProcessTool(BaseTool):
         }
 
     def _get_confirmation_message(self, **kwargs) -> str:
-        """生成确认提示"""
+        """
+        生成确认提示消息
+        重写基类方法，提供更具体的确认信息
+
+        Returns:
+            确认提示消息
+        """
         action = kwargs.get("action", "")
         approval_id = kwargs.get("approval_id", "")
 

@@ -1,3 +1,9 @@
+"""
+审批查询工具
+- 查询审批状态、发起新的审批申请
+- 支持请假、报销、采购等审批类型
+- 当前为模拟数据实现，预留审批系统对接接口
+"""
 from typing import Any
 from .base import BaseTool, ToolResult
 
@@ -6,6 +12,7 @@ class ApprovalQueryTool(BaseTool):
     """审批查询工具 - 查看/发起自己的审批"""
 
     def __init__(self):
+        """初始化审批查询工具"""
         super().__init__(
             name="approval_query",
             description="查询审批状态、发起新的审批申请。可查看请假、报销、采购等审批流程。",
@@ -17,9 +24,13 @@ class ApprovalQueryTool(BaseTool):
     async def execute(self, action: str = "query", approval_type: str = "", **kwargs) -> ToolResult:
         """
         执行审批操作
+
         Args:
-            action: 操作类型 (query, create)
-            approval_type: 审批类型 (leave, expense, purchase)
+            action: 操作类型（query/create）
+            approval_type: 审批类型（leave/expense/purchase）
+
+        Returns:
+            操作结果
         """
         try:
             if action == "query":
@@ -33,7 +44,15 @@ class ApprovalQueryTool(BaseTool):
             return ToolResult(success=False, error=f"审批操作失败: {str(e)}")
 
     async def _query_approvals(self, approval_type: str) -> ToolResult:
-        """查询审批列表"""
+        """
+        查询审批列表
+
+        Args:
+            approval_type: 审批类型筛选
+
+        Returns:
+            审批列表
+        """
         mock_approvals = [
             {
                 "id": "APR-001",
@@ -51,6 +70,7 @@ class ApprovalQueryTool(BaseTool):
             },
         ]
 
+        # 按类型筛选
         if approval_type:
             mock_approvals = [a for a in mock_approvals if approval_type in a["type"]]
 
@@ -72,7 +92,15 @@ class ApprovalQueryTool(BaseTool):
         return ToolResult(success=True, data=result)
 
     async def _create_approval(self, approval_type: str, **kwargs) -> ToolResult:
-        """发起新审批"""
+        """
+        发起新审批
+
+        Args:
+            approval_type: 审批类型
+
+        Returns:
+            创建结果
+        """
         if not approval_type:
             return ToolResult(success=False, error="请指定审批类型")
 

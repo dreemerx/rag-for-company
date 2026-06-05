@@ -1,19 +1,26 @@
+import os
 import pytest
 import pytest_asyncio
-import asyncio
 from httpx import AsyncClient, ASGITransport
+
+# 设置测试环境变量（必须在导入 app 之前）
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-testing-only")
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./data/test.db")
+
 from backend.main import app
 from backend.database import init_db
 
 
 @pytest_asyncio.fixture(scope="session")
 async def setup_db():
+    """初始化测试数据库"""
     await init_db()
     yield
 
 
 @pytest_asyncio.fixture
 async def client(setup_db):
+    """获取测试客户端"""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
