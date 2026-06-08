@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 import json
 import logging
@@ -23,7 +23,7 @@ chat_router = APIRouter(prefix="/chat", tags=["对话"])
 # ==================== Schemas ====================
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1, max_length=10000)
     session_id: Optional[int] = None
 
 

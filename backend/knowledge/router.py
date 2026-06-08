@@ -42,9 +42,19 @@ async def upload_documents(
                 })
                 continue
 
+            # 读取文件并检查大小（限制 50MB）
+            content = await file.read()
+            max_file_size = 50 * 1024 * 1024
+            if len(content) > max_file_size:
+                results.append({
+                    "filename": file.filename,
+                    "success": False,
+                    "error": "文件过大，最大支持 50MB",
+                })
+                continue
+
             # 保存临时文件
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                content = await file.read()
                 tmp.write(content)
                 temp_path = tmp.name
                 temp_files.append(temp_path)

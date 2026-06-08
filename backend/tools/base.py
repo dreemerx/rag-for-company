@@ -112,7 +112,7 @@ class BaseTool(ABC):
         for key, friendly_msg in error_map.items():
             if key in str(error).lower():
                 return friendly_msg
-        return f"操作失败: {error}，请联系管理员或稍后再试"
+        return "操作失败，请联系管理员或稍后再试"
 
     def to_llama_tool(self):
         """转换为 LlamaIndex 工具格式（供 Agent 调用）"""

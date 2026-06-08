@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Milvus 依赖服务
   etcd:
@@ -20,14 +18,14 @@ services:
       retries: 3
 
   minio:
-    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    image: docker.1ms.run/minio/minio:RELEASE.2023-03-20T20-16-18Z
     container_name: milvus-minio
     environment:
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
     ports:
-      - "9001:9001"
-      - "9000:9000"
+      - "127.0.0.1:9001:9001"
+      - "127.0.0.1:9000:9000"
     volumes:
       - ./data/minio:/minio_data
     command: minio server /minio_data --console-address ":9001"
@@ -39,7 +37,7 @@ services:
 
   # Milvus 向量数据库
   milvus:
-    image: milvusdb/milvus:v2.4-latest
+    image: docker.1ms.run/milvusdb/milvus:v2.4.0
     container_name: milvus-standalone
     environment:
       ETCD_ENDPOINTS: etcd:2379

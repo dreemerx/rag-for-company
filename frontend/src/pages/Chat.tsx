@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons'
 import { useChatStore } from '../store/chat'
 import ReactMarkdown from 'react-markdown'
+import rehypeSanitize from 'rehype-sanitize'
 
 const { Text } = Typography
 
@@ -411,7 +412,7 @@ const Chat: React.FC = () => {
                     }}
                   >
                     {msg.role === 'assistant' ? (
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{msg.content}</ReactMarkdown>
                     ) : (
                       <span>{msg.content}</span>
                     )}

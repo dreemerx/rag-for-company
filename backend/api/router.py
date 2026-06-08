@@ -4,11 +4,13 @@ API 路由聚合模块
 - 聚合认证、对话、评测、知识库四个子路由
 - 提供健康检查和监控指标端点
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from backend.auth.router import router as auth_router
 from backend.chat.router import chat_router
 from backend.evaluation.router import eval_router
 from backend.knowledge.router import knowledge_router
+from backend.auth.rbac import require_role
+from backend.auth.models import User
 from backend.utils import metrics
 
 # 创建带统一前缀的路由
@@ -28,6 +30,6 @@ async def health_check():
 
 
 @api_router.get("/metrics")
-async def get_metrics():
-    """监控指标端点"""
+async def get_metrics(current_user: User = Depends(require_role("admin"))):
+    """监控指标端点（仅管理员）"""
     return metrics.get_snapshot()

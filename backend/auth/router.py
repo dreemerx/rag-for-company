@@ -28,6 +28,11 @@ _register_rate_limit: dict = defaultdict(list)
 REGISTER_RATE_LIMIT = 5  # 每分钟最多注册次数
 REGISTER_RATE_WINDOW = 60  # 时间窗口（秒）
 
+# 登录限流：IP -> [(timestamp, ...)]
+_login_rate_limit: dict = defaultdict(list)
+LOGIN_RATE_LIMIT = 10  # 每分钟最多登录尝试次数
+LOGIN_RATE_WINDOW = 60  # 时间窗口（秒）
+
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(request: Request, user_data: UserCreate, db: AsyncSession = Depends(get_db)):
@@ -46,11 +51,18 @@ async def register(request: Request, user_data: UserCreate, db: AsyncSession = D
     _register_rate_limit[client_ip].append(now)
 
     # 密码强度验证
-    if len(user_data.password) < 8:
+    pwd = user_data.password
+    if len(pwd) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="密码长度至少为8位"
         )
+    if not any(c.isupper() for c in pwd):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="密码需包含至少一个大写字母")
+    if not any(c.islower() for c in pwd):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="密码需包含至少一个小写字母")
+    if not any(c.isdigit() for c in pwd):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="密码需包含至少一个数字")
 
     try:
         result = await _register_user(user_data, db)
@@ -119,8 +131,21 @@ async def _register_user(user_data: UserCreate, db: AsyncSession):
 
 
 @router.post("/login", response_model=Token)
-async def login(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
+async def login(request: Request, user_data: UserLogin, db: AsyncSession = Depends(get_db)):
     """用户登录"""
+    # 登录限流（防暴力破解）
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    _login_rate_limit[client_ip] = [
+        ts for ts in _login_rate_limit[client_ip] if ts > now - LOGIN_RATE_WINDOW
+    ]
+    if len(_login_rate_limit[client_ip]) >= LOGIN_RATE_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="登录尝试过于频繁，请稍后再试"
+        )
+    _login_rate_limit[client_ip].append(now)
+
     result = await db.execute(
         select(User)
         .where(User.username == user_data.username)

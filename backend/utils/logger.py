@@ -1,9 +1,27 @@
 import logging
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
+
+# 敏感信息匹配模式（密码、token、密钥等）
+_SENSITIVE_PATTERNS = [
+    (re.compile(r'(password|passwd|pwd)\s*[=:]\s*\S+', re.IGNORECASE), r'\1=***REDACTED***'),
+    (re.compile(r'(token|secret|api_key|apikey|authorization)\s*[=:]\s*\S+', re.IGNORECASE), r'\1=***REDACTED***'),
+    (re.compile(r'Bearer\s+\S+', re.IGNORECASE), 'Bearer ***REDACTED***'),
+]
+
+
+class SensitiveDataFilter(logging.Filter):
+    """过滤日志中的敏感信息"""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            for pattern, replacement in _SENSITIVE_PATTERNS:
+                record.msg = pattern.sub(replacement, record.msg)
+        return True
 
 
 class JSONFormatter(logging.Formatter):
@@ -55,10 +73,14 @@ def setup_logging(log_dir: str = "data/logs", log_level: str = "INFO"):
     # 清除已有的 handler（避免重复）
     root_logger.handlers.clear()
 
+    # 添加敏感信息过滤器
+    sensitive_filter = SensitiveDataFilter()
+
     # 控制台 handler — 人类可读
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(ReadableFormatter())
     console_handler.setLevel(logging.DEBUG)
+    console_handler.addFilter(sensitive_filter)
     root_logger.handlers.append(console_handler)
 
     # 文件 handler — JSON 格式，按天轮转，保留 30 天
@@ -71,6 +93,7 @@ def setup_logging(log_dir: str = "data/logs", log_level: str = "INFO"):
     )
     file_handler.setFormatter(JSONFormatter())
     file_handler.setLevel(logging.INFO)
+    file_handler.addFilter(sensitive_filter)
     root_logger.handlers.append(file_handler)
 
     # 错误单独文件
@@ -83,6 +106,7 @@ def setup_logging(log_dir: str = "data/logs", log_level: str = "INFO"):
     )
     error_handler.setFormatter(JSONFormatter())
     error_handler.setLevel(logging.ERROR)
+    error_handler.addFilter(sensitive_filter)
     root_logger.handlers.append(error_handler)
 
     logging.getLogger("httpx").setLevel(logging.WARNING)
